@@ -1,4 +1,4 @@
-# Investigating Real-Time Communication Between Asymmetric Processors with OpenAMP (Hypervisorless VirtIO) 
+# Investigating Real-Time Communication Between Asymmetric Processors with OpenAMP (Hypervisorless VirtIO)
 
 This repository contains the custom firmware, linker scripts, and testing procedures used to analyze an experimental **Hypervisorless VirtIO** architecture. The project demonstrates how to establish lateral Inter-Processor Communication (IPC) between a Linux Master (Cortex-A53) and a Zephyr RTOS Remote (Cortex-R5F) on a Zynq UltraScale+ MPSoC, entirely bypassing the need for a heavyweight hypervisor.
 
