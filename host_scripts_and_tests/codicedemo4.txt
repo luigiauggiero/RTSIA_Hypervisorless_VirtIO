@@ -1,0 +1,33 @@
+#!/bin/sh
+
+R5_0=/sys/class/remoteproc/remoteproc0
+
+echo "Run the setup script in the background"
+# special syntax below creates an orphan process
+# for busybox ash this allows it to write to the tty and still continue
+(( /hvl/setup.sh & ) & )  # Master Linux needs to prepare network infrastructure for virtual devices
+						  # Virtual TAP interface on the emulated Linux system, with IP 192.168.200.254
+# allow messages to come out
+sleep 1
+
+echo "we need to wait for the entropy to build up in the Linux system"
+sleep 6 # Why? Remote processor's firmware (with Zephr running) is programmed to use a Virtio Entropy device
+		# As soon as Zephyr turns on, it will ask Linux some random numbers through the shared memory, and therefore Linux needs some seconds to generate this entropy before Zephyr even asks for it
+
+echo "Now we will start the firmware"
+echo start >$R5_0/state
+sleep 1
+
+echo "look at the 2nd UART, you should see the results of the entropy test"
+sleep 6 # Zephyr is configured to send its system logs on a different serial (2nd UART), where there will be the random numbers Zephyr obtained from Linux through VirtIO
+
+echo "now we will ping the firmware through the virtio-net device"
+ping -c 3 192.168.200.2  # That's where really VirtIO kicks in! Instead of sending a text payload like in RPMsg, Linux Master throws a simple ping to the Zephyr IP. 
+						 # ping's ICMP packets don't travel on physical cables, but rather inserted from VirtIO directly in the ring buffers of the shared memory, where Zephyr is able to read them and then answer.
+						
+
+echo "now click in the 2nd UART pane to give it focus"
+echo "try these commands from the 2nd UART"
+echo "    device list"
+echo "    net iface"
+echo "    net ping -c 20 192.168.200.254"
