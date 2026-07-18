@@ -1,0 +1,3 @@
+xp /32xw 0x37000000    /* to inspect shmem header and point out virtio hypervisorless features there mapped */
+
+xp /128c 0x370078e8    /* to display custom memory content and format it in characters */
