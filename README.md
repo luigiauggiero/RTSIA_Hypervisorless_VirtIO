@@ -4,7 +4,7 @@ This repository contains the custom firmware, linker scripts, and testing proced
 
 Instead of traditional VM-Exits and hypervisor-managed dynamic memory, this implementation relies on a user-space Physical Machine Monitor (PMM), direct hardware Inter-Processor Interrupts (IPIs), and explicitly shared static memory bounce buffers.
 
-Author: Emanuele Barbato
+Author: Emanuele Barbato, Luigi Auggiero
 
 ---
 
@@ -40,7 +40,7 @@ The project relies on a QEMU-emulated ZCU102 environment. The following steps re
 From the Linux master console, flood the network with a custom payload (hex `52`, ASCII `'R'`) using a larger packet size to stress the bounce buffers:
 ```bash
 ping -p 52 -s 128 -c 500 192.168.200.2 > /dev/null &
-
+```
 B. Static Memory Inspection (QEMU Monitor)
 Suspend the emulator and access the QEMU monitor to bypass Linux CONFIG_STRICT_DEVMEM restrictions. Examine the base address of the shared memory:
 
@@ -54,4 +54,13 @@ xp /128c 0x370078e8
 
 Expected Output: Right after the non-printable MAC/IP/ICMP headers, you will see a continuous block of 'R' characters, visually proving the transit of the explicitly copied payload through the shared memory bounce buffers.
 
+## ⚠️ Physical Hardware Status (Xilinx ZCU102)
+
+While the real-time firmware compiles into a valid ELF binary loadable via remoteproc, execution on physical silicon is currently blocked by an architectural memory-attribute conflict:
+
+- The generic Linux UIO driver (uio_pdrv_genirq) maps physical shared memory as Device Memory (Device-nGnRE).
+
+- Compiler-optimized paired stores (STP) emitted by the PMM trigger fatal hardware Alignment Faults (BUS_ADRALN) on ARMv8-A cores when targeting Device Memory.
+
+- Addressing this bottleneck requires reconfiguring the devicetree (DTS) and rebuilding the platform BSP to back the shared aperture with a CMA-managed coherent memory pool (uio_dmem_genirq).
 
