@@ -14,11 +14,11 @@ The bulk of the work involves adapting the Zephyr RTOS firmware (`zephyr.elf`) t
 
 ### 1. Static Memory & VirtQueue Allocation
 In a standard environment, the hypervisor allocates VirtQueues dynamically. Here, the firmware is hardcoded to map the VirtIO-MMIO transport directly onto a pre-shared physical memory pool.
-* **`prj.conf`**: We explicitly enable the custom linker script (`CONFIG_HAVE_CUSTOM_LINKER_SCRIPT=y`) and inject a specific compiler flag (`-DHVL_VIRTIO`) to trigger the experimental hypervisorless routines in the OpenAMP libraries.
+* **`prj.conf`**: Explicitly enables the custom linker script (`CONFIG_HAVE_CUSTOM_LINKER_SCRIPT=y`) and inject a specific compiler flag (`-DHVL_VIRTIO`) to trigger the experimental hypervisorless routines in the OpenAMP libraries.
 * **`linker_r5_hvl.ld`**: The memory layout is statically defined. The shared memory pool is mapped at `0x37000000`. Crucially, the `KEEP(*(.shared.vring.*))` directive forces the linker to allocate the VirtQueue control rings exactly within this shared physical space, making them symmetrically accessible to the Linux PMM.
 
 ### 2. Hardware IPIs over VM-Exits
-Without a hypervisor, standard VirtIO "doorbell" registers (VM-exits) cannot trap memory accesses. We replaced them with direct hardware signaling.
+Without a hypervisor, standard VirtIO "doorbell" registers (VM-exits) cannot trap memory accesses. This approach replaces them with direct hardware signaling.
 * **`src/xlnx_ipi.c`**: This custom driver manages the Xilinx ZynqMP IPI hardware block. 
   * The "kick" notification is implemented in `xlnx_ipi_notify()`, which uses the `WRITE32(dev, IPI_TRIG, (1 << 24))` macro to physically raise an interrupt line towards the Linux master.
   * The reverse notification is caught by the `xlnx_ipi_isr()` hardware interrupt service routine, which triggers the `virtio_mmio_hvl_cb_run()` callback to instruct the driver to scan the Used Ring.
