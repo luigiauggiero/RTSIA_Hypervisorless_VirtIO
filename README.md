@@ -14,7 +14,7 @@ The bulk of the work involves adapting the Zephyr RTOS firmware (`zephyr.elf`) t
 
 ### 1. Static Memory & VirtQueue Allocation
 In a standard environment, the hypervisor allocates VirtQueues dynamically. Here, the firmware is hardcoded to map the VirtIO-MMIO transport directly onto a pre-shared physical memory pool.
-* **`prj.conf`**: Explicitly enables the custom linker script (`CONFIG_HAVE_CUSTOM_LINKER_SCRIPT=y`) and inject a specific compiler flag (`-DHVL_VIRTIO`) to trigger the experimental hypervisorless routines in the OpenAMP libraries.
+* **`prj.conf`**: Explicitly enables the custom linker script (`CONFIG_HAVE_CUSTOM_LINKER_SCRIPT=y`) and injects a specific compiler flag (`-DHVL_VIRTIO`) to trigger the experimental hypervisorless routines in the OpenAMP libraries.
 * **`linker_r5_hvl.ld`**: The memory layout is statically defined. The shared memory pool is mapped at `0x37000000`. Crucially, the `KEEP(*(.shared.vring.*))` directive forces the linker to allocate the VirtQueue control rings exactly within this shared physical space, making them symmetrically accessible to the Linux PMM.
 
 ### 2. Hardware IPIs over VM-Exits
@@ -41,16 +41,20 @@ From the Linux master console, flood the network with a custom payload (hex `52`
 ```bash
 ping -p 52 -s 128 -c 500 192.168.200.2 > /dev/null &
 ```
-B. Static Memory Inspection (QEMU Monitor)
+### B. Static Memory Inspection (QEMU Monitor)
 Suspend the emulator and access the QEMU monitor to bypass Linux CONFIG_STRICT_DEVMEM restrictions. Examine the base address of the shared memory:
 
-xp /32xw 0x37000000
+```text
+(qemu) xp /32xw 0x37000000
+```
 
 Expected Output: You will spot 0x74726976 (the v i r t magic string) and 0x4d564b4c (L K V M Vendor ID), proving the VirtIO device was created by the user-space PMM, not a hypervisor.
-C. Dynamic Payload Interception
+### C. Dynamic Payload Interception
 Traverse the Descriptor Ring (around 0x37001000) to find the physical pointer of the active Bounce Buffer currently allocated by libmetal. Once the address is found (e.g., 0x370078e8), decode it as ASCII characters:
 
-xp /128c 0x370078e8
+```text
+(qemu) xp /128c 0x370078e8
+```
 
 Expected Output: Right after the non-printable MAC/IP/ICMP headers, you will see a continuous block of 'R' characters, visually proving the transit of the explicitly copied payload through the shared memory bounce buffers.
 
