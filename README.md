@@ -62,9 +62,8 @@ Expected Output: Right after the non-printable MAC/IP/ICMP headers, you will see
 
 While the real-time firmware compiles into a valid ELF binary loadable via remoteproc, execution on physical silicon is currently blocked by an architectural memory-attribute conflict:
 
-- The generic Linux UIO driver (uio_pdrv_genirq) maps physical shared memory as Device Memory (Device-nGnRE).
-
-- Compiler-optimized paired stores (STP) emitted by the PMM trigger fatal hardware Alignment Faults (BUS_ADRALN) on ARMv8-A cores when targeting Device Memory.
-
-- Addressing this bottleneck requires reconfiguring the devicetree (DTS) and rebuilding the platform BSP to back the shared aperture with a CMA-managed coherent memory pool (uio_dmem_genirq).
-
+* **The Root Cause:** The generic Linux UIO driver (`uio_pdrv_genirq`) maps physical shared memory with *Device Memory* (`Device-nGnRE`) attributes via `pgprot_noncached()`. Compiler-optimized paired stores (`STP`) emitted by `lkvm` trigger fatal hardware Alignment Faults (`BUS_ADRALN` / `SIGBUS`) on ARMv8-A cores when targeting Device Memory regions.
+* **Evaluated Mitigation (`uio_bypass.c`):** The repository includes `uio_bypass.c`, a user-space interception shim compiled as an `LD_PRELOAD` shared object. It intercepts `open()` and `mmap()` calls to redirect `/dev/uio0` descriptors to raw physical memory via `/dev/mem` (using direct `svc #0` syscalls to bypass target GLIBC mismatches). 
+  * *Outcome:* While it bypasses dynamic linker issues, `/dev/mem` still defaults to Device Memory under ARM64 kernel restrictions, and completely severing UIO cuts off the asynchronous hardware IPI notification path.
+ 
+A viable fix without rebuilding the kernel/DTS hasn't been found yet, so physical deployment is currently an open challenge.
